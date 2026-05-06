@@ -1,0 +1,46 @@
+require("module-alias/register");
+require("dotenv").config();
+const jobs = require("@/jobs");
+const queueService = require("@/services/queue.service");
+const sleep = require("@/utils/sleep");
+const { jobStatus } = require("@/configs/constants");
+
+(async () => {
+    while (true) {
+        // Do something...
+        const firstJob = await queueService.getPendingJob();
+        if (firstJob) {
+            const { id, type, payload: jsonPayload } = firstJob;
+
+            try {
+                console.log(`Job "${type}" processing...`);
+
+                const payload = JSON.parse(jsonPayload);
+
+                // Update status: "inprogress"
+                queueService.updateStatus(id, jobStatus.inprogress);
+
+                const handle = jobs[type];
+                if (handle) {
+                    await handle(payload);
+                } else {
+                    console.log(`Chua co logic xu ly cho job: ${type}`);
+                }
+
+                // Update status: "completed"
+                queueService.updateStatus(id, jobStatus.completed);
+
+                console.log(`Job "${type}" processed.`);
+} catch (error) {
+    console.log(`Job "${type}" failed.`);
+    console.error("Chi tiết lỗi:", error); // thêm dòng này
+    const info = JSON.stringify({
+        message: String(error),
+    });
+    queueService.updateStatus(id, jobStatus.failed, info);
+}
+        }
+
+        await sleep(3000);
+    }
+})();
