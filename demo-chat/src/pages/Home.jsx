@@ -1,11 +1,28 @@
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useGetUsersQuery } from "@/store/api/usersApi";
-import { newChatUrl } from "@/config/routes";
+import { useFindOrCreateConversationMutation } from "@/store/api/conversationsApi";
+import { conversationUrl } from "@/config/routes";
 import { PageTitle, Spinner, UserCard } from "@/components/ui";
 
 function Home() {
     const { data: users = [], isLoading } = useGetUsersQuery();
     const { state } = useLocation();
+    const navigate = useNavigate();
+    const [findOrCreate, { isLoading: isFinding }] =
+        useFindOrCreateConversationMutation();
+
+    const handleUserClick = async (e, userId) => {
+        e.preventDefault();
+        try {
+            const conversation = await findOrCreate({
+                type: "dm",
+                user_ids: [userId],
+            }).unwrap();
+            navigate(conversationUrl(conversation.id));
+        } catch {
+            // silently ignore — user stays on home
+        }
+    };
 
     return (
         <div className="max-w-2xl mx-auto p-6">
@@ -28,10 +45,18 @@ function Home() {
                 <ul className="space-y-2">
                     {users.map((user) => (
                         <li key={user.id}>
-                            <UserCard to={newChatUrl(user.id)}>
-                                <span className="text-slate-800 font-medium">
-                                    {user.email}
-                                </span>
+                            <UserCard
+                                to="#"
+                                onClick={(e) => handleUserClick(e, user.id)}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-slate-800 font-medium">
+                                        {user.email}
+                                    </span>
+                                    {isFinding && (
+                                        <Spinner size="sm" />
+                                    )}
+                                </div>
                             </UserCard>
                         </li>
                     ))}
